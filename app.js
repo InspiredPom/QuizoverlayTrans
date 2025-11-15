@@ -390,7 +390,8 @@
 
   function reset(){
     clearTimer(); hideBanner(); stopPoll(); stopGhostDance();
-    state.locked = false; setScore(0); setBossHP(100); setPlayerHP(0);
+    state.locked = false; setBossHP(100); setPlayerHP(0);
+    // state.locked = false; setScore(0); setBossHP(100); setPlayerHP(0);
     ACTIVE = shuffle(QUESTIONS); state.questionIndex = 0; feedback.textContent = "";
     ghostieResetFace();
     renderQuestion();
