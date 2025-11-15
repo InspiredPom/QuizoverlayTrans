@@ -1,0 +1,137 @@
+<!-- index.html -->
+<!-- Simply bash npx http-server -p 8080 . and the quiz questions  with be in sync on website and obs. -->
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Fact vs Myth — Chat Poll + Ghostie</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- Fact vs Myth — Chat Poll + Ghostie (with safe JSON importer) -->
+  <div id="app" aria-live="polite">
+    <!-- HUD -->
+    <header class="hud">
+      <div class="badge">Fact vs Myth</div>
+      <div class="score">Score: <strong id="scoreVal">0</strong></div>
+    </header>
+
+    <!-- Enemy (Ghostie) -->
+    <section class="enemy">
+      <div class="enemy-wrap">
+        <div id="hitOverlay" class="hit-overlay" aria-hidden="true"></div>
+
+        <!-- FULL SVG (all IDs present) -->
+        <svg id="gremlin" viewBox="0 0 220 160" width="220" height="160" aria-label="Ghostie enemy">
+          <!-- Body -->
+          <g id="g-body">
+            <ellipse cx="110" cy="85" rx="70" ry="60" fill="#F5FCFF" stroke="#000000" stroke-width="3"/>
+            <path d="M40,95 Q15,75 45,70" fill="#F5FCFF" stroke="#000000" stroke-width="3"/>
+            <path d="M180,95 Q205,75 175,70" fill="#F5FCFF" stroke="#000000" stroke-width="3"/>
+            <circle cx="85" cy="35" r="7" fill="#AECCE4" stroke="#000000" stroke-width="3"/>
+            <circle cx="135" cy="35" r="7" fill="#AECCE4" stroke="#000000" stroke-width="3"/>
+          </g>
+
+          <!-- Eyes (normal) -->
+          <g id="g-eyes">
+            <ellipse id="eyeL" cx="85" cy="72" rx="12" ry="10" fill="#fff" stroke="#000000" stroke-width="3"/>
+            <circle id="pupilL" cx="88" cy="74" r="8" fill="#222"/>
+            <ellipse id="eyeR" cx="135" cy="72" rx="12" ry="10" fill="#fff" stroke="#000000" stroke-width="3"/>
+            <circle id="pupilR" cx="132" cy="74" r="8" fill="#222"/>
+            <!-- Eyelids (blink) -->
+            <rect id="lidL" x="73" y="58" width="24" height="24" fill="#f0feff" rx="12" ry="12" style="opacity:0" stroke="#000000" stroke-width="3"/>
+            <rect id="lidR" x="123" y="58" width="24" height="24" fill="#f0feff" rx="12" ry="12" style="opacity:0" stroke="#000000" stroke-width="3"/>
+          </g>
+
+          <!-- Mouths -->
+          <g id="g-mouth">
+            <path id="mouth-smile"  d="M90,100 Q110,115 130,100" stroke="#222" stroke-width="4" fill="none" stroke-linecap="round"/>
+            <path id="mouth-sad"    d="M90,110 Q110,95 130,110"  stroke="#222" stroke-width="4" fill="none" stroke-linecap="round" style="display:none"/>
+            <path id="mouth-defeat" d="M88,118 Q110,85 132,118"  stroke="#b91c1c" stroke-width="5" fill="none" stroke-linecap="round" style="display:none"/>
+          </g>
+
+          <!-- X-eyes for defeat -->
+          <g id="g-defeat-eyes" style="display:none">
+            <line x1="78" y1="66" x2="92" y2="78" stroke="#b91c1c" stroke-width="4"/>
+            <line x1="92" y1="66" x2="78" y2="78" stroke="#b91c1c" stroke-width="4"/>
+            <line x1="128" y1="66" x2="142" y2="78" stroke="#b91c1c" stroke-width="4"/>
+            <line x1="142" y1="66" x2="128" y2="78" stroke="#b91c1c" stroke-width="4"/>
+          </g>
+        </svg>
+      </div>
+    </section>
+
+    <!-- Boss HP -->
+    <section class="boss">
+      <div class="boss-label">
+        <span>Ghostie</span>
+        <span id="bossHpText">100%</span>
+      </div>
+      <div class="boss-bar"><div id="bossHpFill"></div></div>
+    </section>
+
+    <!-- Question Card -->
+    <main class="card" role="group" aria-labelledby="qText">
+      <h2 id="qText">Loading…</h2>
+
+      <!-- Chat Poll HUD -->
+      <div class="poll" id="poll" hidden>
+        <div class="poll-title">Chat Poll <span id="pollTimer">12</span>s</div>
+        <div class="poll-bars" id="pollBars"></div>
+        <div class="poll-hint">Type <strong>!vote 1</strong> or <strong>!vote 2</strong> (also <strong>!fact</strong>/<strong>!myth</strong>)</div>
+      </div>
+
+      <div class="answers" id="answers"></div>
+    </main>
+
+    <!-- Feedback & Banner -->
+    <div id="feedback" class="feedback" aria-live="assertive"></div>
+    <div id="banner" class="banner" hidden></div>
+
+    <!-- Player "Misinfo" meter -->
+    <section class="player">
+      <div class="player-label">
+        <span>Apathy</span>
+        <span id="playerHpText">0%</span>
+      </div>
+      <div class="player-bar"><div id="playerHpFill"></div></div>
+    </section>
+
+    <!-- Dev & Sim -->
+    <!-- <p> ignore this<p> -->
+    <aside class="dev">
+      <div class="row">
+        <button id="btnCorrect">Force Correct</button>
+        <button id="btnWrong">Force Wrong</button>
+        <button id="btnWin">Win Test</button>
+        <button id="btnLose">Lose Test</button>
+        <button id="btnReset">Reset</button>
+        <button id="btnPause">Pause</button>
+      </div>
+    </aside>
+
+    <aside class="sim">
+      <div class="row">
+        <!-- <button id="btnSimStart">Start Fake Votes</button> -->
+        <!-- <button id="btnSimStop">Stop Fake Votes</button> -->
+        <!-- <label class="simrate">Rate
+          <input id="simRate" type="range" min="1" max="20" value="8" />
+          <span id="simRateVal">8/s</span>
+        </label> -->
+      </div>
+    </aside>
+
+    <!-- JSON Import (safe, client-only) -->
+    <!-- <aside class="importer">
+      <input type="file" id="qJsonFile" accept=".json,application/json">
+      <button id="btnImportReplace" type="button">Import JSON (replace)</button>
+      <button id="btnImportAppend"  type="button">Import JSON (append)</button>
+      <small id="importMsg" aria-live="polite"></small>
+    </aside> -->
+  </div>
+
+  <!-- Load JS once, after markup -->
+  <script defer src="app.js"></script>
+</body>
+</html>
