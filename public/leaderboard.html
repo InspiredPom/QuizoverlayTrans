@@ -15,24 +15,41 @@
   <h2>Leaderboard</h2>
   <div id="status" class="loading">Loading…</div>
   <div class="meta">Shows top users by points (read-only).</div>
+  <div><small id="lastUpdated" class="meta"></small></div>
+  <div style="margin:8px 0">
+    <input id="testUser" placeholder="Test username" value="TestUser" style="padding:6px; font-size:14px" />
+    <button id="btnTestAdd" style="padding:6px 10px; font-size:14px">Add test point</button>
+    <span id="testStatus" style="margin-left:8px;color:#666"></span>
+  </div>
   <ol id="list"></ol>
 
   <script>
+    const POLL_MS = 5000;
+    let pollTimer = null;
+
+    function renderRows(data) {
+      const list = document.getElementById('list');
+      list.innerHTML = '';
+      (data || []).forEach((e, idx) => {
+        const li = document.createElement('li');
+        const name = e.username || e.userId || 'Anonymous';
+        li.textContent = `${idx + 1}. ${name} — ${e.points || 0} points`;
+        list.appendChild(li);
+      });
+    }
+
     async function loadTop(limit = 50) {
       const status = document.getElementById('status');
+      const last = document.getElementById('lastUpdated');
       try {
-        const res = await fetch('/api/leaderboard/top?limit=' + limit);
+        status.textContent = 'Loading…';
+        status.className = '';
+        const res = await fetch(API_BASE ? (API_BASE + '/api/leaderboard/top?limit=' + limit) : ('/api/leaderboard/top?limit=' + limit));
         if (!res.ok) throw new Error('HTTP ' + res.status);
         const json = await res.json();
-        const list = document.getElementById('list');
-        list.innerHTML = '';
-        (json.data || []).forEach(e => {
-          const li = document.createElement('li');
-          const name = e.username || e.userId || 'Anonymous';
-          li.textContent = name + ' — ' + (e.points || 0) + ' points' + (e.walletAddress ? ' (wallet set)' : '');
-          list.appendChild(li);
-        });
+        renderRows(json.data || []);
         status.textContent = '';
+        last.textContent = 'Last updated: ' + new Date().toLocaleTimeString();
       } catch (err) {
         console.error(err);
         status.textContent = 'Failed to load leaderboard';
@@ -40,7 +57,37 @@
       }
     }
 
-    loadTop();
+    function startPolling() {
+      if (pollTimer) clearInterval(pollTimer);
+      loadTop();
+      pollTimer = setInterval(() => loadTop(), POLL_MS);
+    }
+
+    startPolling();
+  </script>
+
+  <script>
+    // Test helper: POST a single point for the typed username
+    document.getElementById('btnTestAdd').addEventListener('click', async function () {
+      const user = document.getElementById('testUser').value.trim() || 'TestUser';
+      const status = document.getElementById('testStatus');
+      status.textContent = 'Sending…';
+      try {
+        const res = await fetch(API_BASE ? (API_BASE + '/api/leaderboard/increment') : '/api/leaderboard/increment', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: user, delta: 1 })
+        });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        status.textContent = 'OK';
+        setTimeout(() => status.textContent = '', 1200);
+        // refresh list immediately
+        loadTop();
+      } catch (err) {
+        console.error(err);
+        status.textContent = 'Failed';
+      }
+    });
   </script>
 </body>
 </html>

@@ -43,6 +43,7 @@
   let pollActive = false, pollEndAt = 0, pollTicker = null;
   let votesByUser = new Map();
   let voteCounts = [];
+  let currentPollId = null;
 
   // --- DOM ---
   const scoreVal     = document.getElementById("scoreVal");
@@ -62,6 +63,10 @@
   const playerHpText = document.getElementById("playerHpText");
   const playerHpFill = document.getElementById("playerHpFill");
   const pauseBtn     = document.getElementById("btnPause");
+
+  // API base: if `window.API_BASE` is set (e.g. by your StreamElements widget or an inline script),
+  // client calls will be prefixed with it. If empty, relative URLs are used (useful for local testing).
+  const API_BASE = (typeof window !== 'undefined' && window.API_BASE) ? String(window.API_BASE).replace(/\/$/, '') : '';
 
   // Importer DOM (optional / commented out in HTML)
   const qFile  = document.getElementById("qJsonFile");
@@ -380,6 +385,16 @@
     renderPollBars(options);
     tickPoll();
 
+    // create a server-side poll so the server (or tmi listener) can collect chat votes
+    try {
+      currentPollId = `p_${Date.now()}_${Math.floor(Math.random()*9999)}`;
+      fetch(API_BASE + '/api/poll/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pollId: currentPollId, options })
+      }).catch(() => { currentPollId = null; });
+    } catch (e) { currentPollId = null; }
+
     if (pollTicker) clearInterval(pollTicker);
     pollTicker = setInterval(tickPoll, 250);
   }
@@ -435,11 +450,55 @@
   }
 
   function finishPoll() {
+    // Prefer server-side tally if available
+    if (currentPollId) {
+      try {
+        fetch(API_BASE + '/api/poll/finish', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pollId: currentPollId })
+        })
+        .then(r => r.json())
+        .then(j => {
+          if (j && typeof j.choiceIdx === 'number') {
+            handleAnswer(j.choiceIdx);
+          } else {
+            // fallback to local
+            localFinishFallback();
+          }
+        }).catch(() => localFinishFallback());
+      } catch (e) {
+        localFinishFallback();
+      }
+    } else {
+      localFinishFallback();
+    }
+
+    currentPollId = null;
+  }
+
+  function localFinishFallback() {
     const max = Math.max(...voteCounts);
     const tops = voteCounts
       .map((v, i) => (v === max ? i : -1))
       .filter(i => i !== -1);
     const choiceIdx = tops[Math.floor(Math.random() * tops.length)];
+
+    // Credit chatters who voted for the winning choice (best-effort client-side)
+    try {
+      for (const [user, idx] of votesByUser.entries()) {
+        if (idx === choiceIdx && user) {
+          try {
+            fetch(API_BASE + '/api/leaderboard/increment', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ username: user, delta: 1 })
+            }).catch(() => {});
+          } catch (e) {}
+        }
+      }
+    } catch (e) {}
+
     handleAnswer(choiceIdx);
   }
 
@@ -476,6 +535,17 @@
       voteCounts[idx]++;
       votesByUser.set(user, idx);
     }
+
+    // Forward the vote to server-side poll collector (best-effort)
+    try {
+      if (currentPollId) {
+        fetch(API_BASE + '/api/poll/vote', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pollId: currentPollId, username: user, text })
+        }).catch(() => {});
+      }
+    } catch (e) {}
 
     renderPollBars(options);
   }
@@ -528,6 +598,20 @@
       stopGhostDance();
       gremlinHit();
       setScore(state.score + 1);        // ✅ score only goes UP here
+      // Best-effort: attribute the point to the last chat user (if available)
+      try {
+        const last = window.__lastChatEvent || null;
+        const userFromEvent = last && (last.displayName || last.nick || last.username || last.user);
+        const username = (userFromEvent || '').toString().trim();
+        if (username) {
+            fetch(API_BASE + '/api/leaderboard/increment', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, delta: 1 })
+          }).catch(() => {});
+        }
+      } catch (e) {}
+
       setBossHP(state.bossHP - 25);
       setPlayerHP(state.playerHP - 10);
       feedback.style.color = "#bbf7d0";
@@ -634,6 +718,8 @@
           data.user ||
           ""
         ).toString();
+        // Store last chat event for attribution when a correct answer gets registered
+        try { window.__lastChatEvent = data; } catch (e) {}
         const item = ACTIVE[state.questionIndex];
         if (item) tryRegisterVote(user, text, item.options);
       }
