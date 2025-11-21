@@ -16,11 +16,13 @@
   <div id="status" class="loading">Loading…</div>
   <div class="meta">Shows top users by points (read-only).</div>
   <div><small id="lastUpdated" class="meta"></small></div>
+
   <div style="margin:8px 0">
     <input id="testUser" placeholder="Test username" value="TestUser" style="padding:6px; font-size:14px" />
     <button id="btnTestAdd" style="padding:6px 10px; font-size:14px">Add test point</button>
     <span id="testStatus" style="margin-left:8px;color:#666"></span>
   </div>
+
   <ol id="list"></ol>
 
   <script>
@@ -44,7 +46,8 @@
       try {
         status.textContent = 'Loading…';
         status.className = '';
-        const res = await fetch(API_BASE ? (API_BASE + '/api/leaderboard/top?limit=' + limit) : ('/api/leaderboard/top?limit=' + limit));
+        // 👇 same-origin API; server.js exposes /api/leaderboard/top
+        const res = await fetch('/api/leaderboard/top?limit=' + limit);
         if (!res.ok) throw new Error('HTTP ' + res.status);
         const json = await res.json();
         renderRows(json.data || []);
@@ -73,7 +76,7 @@
       const status = document.getElementById('testStatus');
       status.textContent = 'Sending…';
       try {
-        const res = await fetch(API_BASE ? (API_BASE + '/api/leaderboard/increment') : '/api/leaderboard/increment', {
+        const res = await fetch('/api/leaderboard/increment', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ username: user, delta: 1 })

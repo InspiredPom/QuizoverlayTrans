@@ -29,11 +29,10 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Serve static files (overlay + leaderboard pages)
-app.use(express.static(path.join(__dirname)));
+// 🔥 Serve static files FROM /public (overlay + leaderboard pages)
+app.use(express.static(path.join(__dirname, 'public')));
 
 // --- Poll collection (optional) ---
-// Holds active polls: { [pollId]: { options: [...], votes: Map<username, idx> } }
 const POLLS = {};
 
 function normalizeVoteText(text, options) {
@@ -41,14 +40,12 @@ function normalizeVoteText(text, options) {
   const raw = String(text).trim();
   const lower = raw.toLowerCase();
 
-  // !vote N
   const m = lower.match(/^!vote\s*(\d{1,2})\b/);
   if (m) {
     const n = parseInt(m[1], 10);
     if (n >= 1 && n <= options.length) return n - 1;
   }
 
-  // aliases fact/myth
   const norm = options.map(o => String(o).toLowerCase());
   if (/^!fact\b/.test(lower)) return norm.indexOf('fact');
   if (/^!myth\b/.test(lower)) return norm.indexOf('myth');
@@ -56,21 +53,25 @@ function normalizeVoteText(text, options) {
   return -1;
 }
 
-// Start a poll: body { pollId, options: [..] }
+// Start a poll
 app.post('/api/poll/start', (req, res) => {
   const body = req.body || {};
   const pollId = String(body.pollId || '').trim();
   const options = Array.isArray(body.options) ? body.options.map(String) : null;
-  if (!pollId || !options || options.length < 2) return res.status(400).json({ error: 'pollId and options required' });
+  if (!pollId || !options || options.length < 2) {
+    return res.status(400).json({ error: 'pollId and options required' });
+  }
   POLLS[pollId] = { options, votes: new Map() };
   return res.json({ ok: true });
 });
 
-// Finish a poll: body { pollId }
+// Finish a poll
 app.post('/api/poll/finish', (req, res) => {
   const body = req.body || {};
   const pollId = String(body.pollId || '').trim();
-  if (!pollId || !POLLS[pollId]) return res.status(400).json({ error: 'unknown pollId' });
+  if (!pollId || !POLLS[pollId]) {
+    return res.status(400).json({ error: 'unknown pollId' });
+  }
 
   const poll = POLLS[pollId];
   const voteCounts = Array.from({ length: poll.options.length }, () => 0);
@@ -81,7 +82,6 @@ app.post('/api/poll/finish', (req, res) => {
   const tops = voteCounts.map((v, i) => (v === max ? i : -1)).filter(i => i !== -1);
   const choiceIdx = tops[Math.floor(Math.random() * tops.length)];
 
-  // Credit winners
   try {
     const scores = readScores();
     for (const [user, idx] of poll.votes.entries()) {
@@ -95,14 +95,11 @@ app.post('/api/poll/finish', (req, res) => {
     console.error('Failed to credit winners', e);
   }
 
-  // teardown poll
   delete POLLS[pollId];
-
   res.json({ ok: true, choiceIdx });
 });
 
-// Accept a direct vote (for testing or server-forwarded messages)
-// body { pollId, username, text }
+// Accept a direct vote
 app.post('/api/poll/vote', (req, res) => {
   const body = req.body || {};
   const pollId = String(body.pollId || '').trim();
@@ -116,12 +113,12 @@ app.post('/api/poll/vote', (req, res) => {
   return res.json({ ok: true });
 });
 
-// --- optional Twitch listener via tmi.js ---
+// optional Twitch listener
 try {
   const tmi = require('tmi.js');
   const BOT = process.env.TWITCH_BOT_USERNAME;
-  const OAUTH = process.env.TWITCH_OAUTH; // e.g., oauth:abcd...
-  const CHANNEL = process.env.TWITCH_CHANNEL; // channel name, without #
+  const OAUTH = process.env.TWITCH_OAUTH;
+  const CHANNEL = process.env.TWITCH_CHANNEL;
 
   if (BOT && OAUTH && CHANNEL) {
     const client = new tmi.Client({
@@ -130,14 +127,15 @@ try {
       channels: [CHANNEL]
     });
 
-    client.connect().then(() => console.log('TMI connected to', CHANNEL)).catch(err => console.error('TMI failed', err));
+    client.connect()
+      .then(() => console.log('TMI connected to', CHANNEL))
+      .catch(err => console.error('TMI failed', err));
 
     client.on('message', (channel, tags, message, self) => {
       if (self) return;
       const username = (tags['display-name'] || tags.username || '').toString();
       const text = message.toString();
 
-      // For all active polls, try to register the vote
       for (const [pollId, poll] of Object.entries(POLLS)) {
         const idx = normalizeVoteText(text, poll.options);
         if (idx >= 0) poll.votes.set(username, idx);
@@ -145,10 +143,10 @@ try {
     });
   }
 } catch (e) {
-  // tmi.js not installed or failed to load; that's OK — it's optional
+  // tmi.js optional
 }
 
-// Increment points for a username. body: { username, delta }
+// Increment points
 app.post('/api/leaderboard/increment', (req, res) => {
   const body = req.body || {};
   const username = String(body.username || '').trim();
@@ -165,7 +163,7 @@ app.post('/api/leaderboard/increment', (req, res) => {
   res.json({ ok: true, username, points: scores[username] });
 });
 
-// Get top N leaderboard entries
+// Get top N
 app.get('/api/leaderboard/top', (req, res) => {
   const limit = Math.max(1, Math.min(500, parseInt(req.query.limit || '50', 10) || 50));
   const scores = readScores();
