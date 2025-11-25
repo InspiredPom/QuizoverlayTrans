@@ -501,7 +501,6 @@
 
     handleAnswer(choiceIdx);
   }
-
   function tryRegisterVote(user, text, options) {
     if (!pollActive || state.paused) return;
     if (!user || !text) return;
@@ -549,6 +548,94 @@
 
     renderPollBars(options);
   }
+
+    // --- Socket.IO: receive Twitch chat forwarded from server.js ---
+  (function initSocket() {
+    try {
+      if (typeof io === "undefined") {
+        console.warn("Socket.IO client not found (no /socket.io/socket.io.js?)");
+        return;
+      }
+
+      const socket = io();
+
+      socket.on("connect", () => {
+        console.log("Socket.IO connected:", socket.id);
+      });
+
+      socket.on("chatMessage", (payload) => {
+        if (!payload) return;
+        const username = (payload.username || "").toString();
+        const text     = (payload.text || "").toString();
+        if (!username || !text) return;
+
+        // remember last chat user for scoring in handleAnswer()
+        try {
+          window.__lastChatEvent = {
+            displayName: username,
+            text
+          };
+        } catch (e) {}
+
+        // feed this into the existing vote logic
+        const item = ACTIVE[state.questionIndex];
+        if (item) {
+          tryRegisterVote(username, text, item.options);
+        }
+      });
+    } catch (e) {
+      console.error("Socket.IO init failed:", e);
+    }
+  })();
+
+
+  // function tryRegisterVote(user, text, options) {
+  //   if (!pollActive || state.paused) return;
+  //   if (!user || !text) return;
+
+  //   const raw   = String(text).trim();
+  //   const lower = raw.toLowerCase();
+  //   let idx = -1;
+
+  //   // "!vote <n>" for any number of options
+  //   const m = lower.match(/^!vote\s*(\d{1,2})\b/);
+  //   if (m) {
+  //     const n = parseInt(m[1], 10);
+  //     if (n >= 1 && n <= options.length) idx = n - 1;
+  //   }
+
+  //   // aliases: !fact / !myth map to labels (case-insensitive)
+  //   if (idx === -1) {
+  //     const norm = options.map(o => String(o).toLowerCase());
+  //     if (/^!fact\b/.test(lower)) idx = norm.indexOf("fact");
+  //     else if (/^!myth\b/.test(lower)) idx = norm.indexOf("myth");
+  //   }
+
+  //   if (idx < 0 || idx >= options.length) return;
+
+  //   const prev = votesByUser.get(user);
+  //   if (prev === undefined) {
+  //     voteCounts[idx]++;
+  //     votesByUser.set(user, idx);
+  //   } else if (prev !== idx) {
+  //     voteCounts[prev]--;
+  //     voteCounts[idx]++;
+  //     votesByUser.set(user, idx);
+  //   }
+
+  //   // Forward the vote to server-side poll collector (best-effort)
+  //   try {
+  //     if (currentPollId) {
+  //       fetch(API_BASE + '/api/poll/vote', {
+  //         method: 'POST',
+  //         headers: { 'Content-Type': 'application/json' },
+  //         body: JSON.stringify({ pollId: currentPollId, username: user, text })
+  //       }).catch(() => {});
+  //     }
+  //   } catch (e) {}
+
+  //   renderPollBars(options);
+  // }
 
   // --- Render & Logic ---
   function renderQuestion() {

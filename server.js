@@ -2,6 +2,9 @@ const express = require('express');
 const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
+require('dotenv').config();       
+const http = require("http"); 
+const { Server } = require("socket.io"); 
 
 const DATA_DIR = path.join(__dirname, 'data');
 const SCORES_FILE = path.join(DATA_DIR, 'scores.json');
@@ -26,10 +29,20 @@ function writeScores(obj) {
 }
 
 const app = express();
+const server = http.createServer(app);       // ⭐ NEW
+const io = new Server(server, { cors: { origin: "*" } }); // ⭐ NEW
+
 app.use(cors());
 app.use(express.json());
 
-// 🔥 Serve static files FROM /public (overlay + leaderboard pages)
+// ⭐ NEW: print when overlay pages connect
+io.on("connection", (socket) => {
+  console.log("Overlay Connected:", socket.id);
+});
+
+// ─────────────────────────────────────────────────────────────────
+//               SERVE FRONT-END OVERLAY + LEADERBOARD
+// ─────────────────────────────────────────────────────────────────
 app.use(express.static(path.join(__dirname, 'public')));
 
 // --- Poll collection (optional) ---
@@ -113,7 +126,9 @@ app.post('/api/poll/vote', (req, res) => {
   return res.json({ ok: true });
 });
 
-// optional Twitch listener
+// ──────────────────────────────────────────────────────────────
+//                       TWITCH CHAT
+// ──────────────────────────────────────────────────────────────
 try {
   const tmi = require('tmi.js');
   const BOT = process.env.TWITCH_BOT_USERNAME;
@@ -122,7 +137,7 @@ try {
 
   if (BOT && OAUTH && CHANNEL) {
     const client = new tmi.Client({
-      options: { debug: false },
+      options: { debug: true },
       identity: { username: BOT, password: OAUTH },
       channels: [CHANNEL]
     });
@@ -133,9 +148,14 @@ try {
 
     client.on('message', (channel, tags, message, self) => {
       if (self) return;
+
       const username = (tags['display-name'] || tags.username || '').toString();
       const text = message.toString();
 
+      // ⭐ Broadcast chat message to overlays
+      io.emit("chatMessage", { username, text });
+
+      // Count as vote if poll is active
       for (const [pollId, poll] of Object.entries(POLLS)) {
         const idx = normalizeVoteText(text, poll.options);
         if (idx >= 0) poll.votes.set(username, idx);
@@ -143,7 +163,7 @@ try {
     });
   }
 } catch (e) {
-  // tmi.js optional
+  console.error("TMI error:", e);
 }
 
 // Increment points
@@ -173,6 +193,6 @@ app.get('/api/leaderboard/top', (req, res) => {
 });
 
 const port = process.env.PORT || 3000;
-app.listen(port, () => {
-  console.log(`Leaderboard API + static server listening on http://localhost:${port}`);
+server.listen(port, () => {                     // ⭐ CHANGED
+  console.log(`Leaderboard + Overlay server running at http://localhost:${port}`);
 });
