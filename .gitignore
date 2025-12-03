@@ -1,17 +1,55 @@
-# Node modules
-node_modules/
+# # Node modules
+# node_modules/
 
-# Local environment variables (IMPORTANT)
+# # Local environment variables (IMPORTANT)
+# .env
+
+# # Logs
+# npm-debug.log*
+# yarn-debug.log*
+# yarn-error.log*
+
+# # OS junk
+# .DS_Store
+# Thumbs.db
+
+# # Optional:
+# data/scores.json
+# ---- Environment Variables ----
 .env
+.env.local
+.env.development
+.env.production
 
-# Logs
+# ---- Node modules ----
+node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# OS junk
+# ---- OS / Editor junk ----
 .DS_Store
 Thumbs.db
 
-# Optional:
+# ---- Logs ----
+logs/
+*.log
+*.log.*
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# ---- Build / cache ----
+dist/
+build/
+.cache/
+.tmp/
+
+# ---- IDE / Editor ----
+.vscode/
+.idea/
+
+# ---- Local data files ----
+# (scores.json contains user data and should NOT be committed if you don't want to expose it)
 data/scores.json
