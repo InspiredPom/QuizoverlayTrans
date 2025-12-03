@@ -10,20 +10,20 @@
       q: "Humans use only 10% of their brains.",
       options: ["Fact", "Myth"],
       correctIndex: 1,
-      explain: "Myth. Imaging shows we use virtually all parts of the brain."
+      explain: "Myth. Imaging shows we use virtually all parts of the brain.",
     },
     {
       q: "Drinking water helps prevent some kidney stones.",
       options: ["Fact", "Myth"],
       correctIndex: 0,
-      explain: "Fact. Hydration lowers risk for common stone types."
+      explain: "Fact. Hydration lowers risk for common stone types.",
     },
     {
       q: "Caffeine makes drinks 'not count' toward hydration.",
       options: ["Fact", "Myth"],
       correctIndex: 1,
-      explain: "Myth. Caffeine is mildly diuretic but fluids still count."
-    }
+      explain: "Myth. Caffeine is mildly diuretic but fluids still count.",
+    },
   ];
 
   // --- State ---
@@ -40,36 +40,41 @@
   let ACTIVE = [];
 
   // Poll state
-  let pollActive = false, pollEndAt = 0, pollTicker = null;
+  let pollActive = false,
+    pollEndAt = 0,
+    pollTicker = null;
   let votesByUser = new Map();
   let voteCounts = [];
   let currentPollId = null;
-
+  let hadVotesThisPoll = false;
   // --- DOM ---
-  const scoreVal     = document.getElementById("scoreVal");
-  const qText        = document.getElementById("qText");
-  const answersWrap  = document.getElementById("answers");
-  const feedback     = document.getElementById("feedback");
-  const bossHpText   = document.getElementById("bossHpText");
-  const bossHpFill   = document.getElementById("bossHpFill");
-  const banner       = document.getElementById("banner");
-  const gremlin      = document.getElementById("gremlin");
-  const lidL         = document.getElementById("lidL");
-  const lidR         = document.getElementById("lidR");
-  const pollBox      = document.getElementById("poll");
-  const pollTimerEl  = document.getElementById("pollTimer");
-  const pollBars     = document.getElementById("pollBars");
-  const hitOverlay   = document.getElementById("hitOverlay");
+  const scoreVal = document.getElementById("scoreVal");
+  const qText = document.getElementById("qText");
+  const answersWrap = document.getElementById("answers");
+  const feedback = document.getElementById("feedback");
+  const bossHpText = document.getElementById("bossHpText");
+  const bossHpFill = document.getElementById("bossHpFill");
+  const banner = document.getElementById("banner");
+  const gremlin = document.getElementById("gremlin");
+  const lidL = document.getElementById("lidL");
+  const lidR = document.getElementById("lidR");
+  const pollBox = document.getElementById("poll");
+  const pollTimerEl = document.getElementById("pollTimer");
+  const pollBars = document.getElementById("pollBars");
+  const hitOverlay = document.getElementById("hitOverlay");
   const playerHpText = document.getElementById("playerHpText");
   const playerHpFill = document.getElementById("playerHpFill");
-  const pauseBtn     = document.getElementById("btnPause");
+  const pauseBtn = document.getElementById("btnPause");
 
   // API base: if `window.API_BASE` is set (e.g. by your StreamElements widget or an inline script),
   // client calls will be prefixed with it. If empty, relative URLs are used (useful for local testing).
-  const API_BASE = (typeof window !== 'undefined' && window.API_BASE) ? String(window.API_BASE).replace(/\/$/, '') : '';
+  const API_BASE =
+    typeof window !== "undefined" && window.API_BASE
+      ? String(window.API_BASE).replace(/\/$/, "")
+      : "";
 
   // Importer DOM (optional / commented out in HTML)
-  const qFile  = document.getElementById("qJsonFile");
+  const qFile = document.getElementById("qJsonFile");
   const btnRep = document.getElementById("btnImportReplace");
   const btnApp = document.getElementById("btnImportAppend");
   const impMsg = document.getElementById("importMsg");
@@ -104,7 +109,8 @@
 
   const setPlayerHP = (pct) => {
     state.playerHP = Math.max(0, Math.min(100, pct));
-    if (playerHpText) playerHpText.textContent = Math.round(state.playerHP) + "%";
+    if (playerHpText)
+      playerHpText.textContent = Math.round(state.playerHP) + "%";
     if (playerHpFill) playerHpFill.style.width = state.playerHP + "%";
   };
 
@@ -127,7 +133,7 @@
   };
 
   const setButtonsDisabled = (disabled) => {
-    document.querySelectorAll("#answers button").forEach(b => {
+    document.querySelectorAll("#answers button").forEach((b) => {
       b.disabled = disabled;
     });
   };
@@ -164,8 +170,12 @@
   }
 
   // Dance toggles
-  function startGhostDance(){ gremlin.classList.add("dance"); }
-  function stopGhostDance(){ gremlin.classList.remove("dance"); }
+  function startGhostDance() {
+    gremlin.classList.add("dance");
+  }
+  function stopGhostDance() {
+    gremlin.classList.remove("dance");
+  }
 
   // Pause / Resume
   function setPaused(p) {
@@ -212,17 +222,20 @@
 
   // Impact point on ellipse (SVG viewBox 220×160)
   function randomImpactPoint() {
-    const cx = 110, cy = 85, rx = 70, ry = 60;
+    const cx = 110,
+      cy = 85,
+      rx = 70,
+      ry = 60;
     const theta = Math.random() * 2 * Math.PI;
     const r = Math.sqrt(Math.random());
     return {
       x: cx + rx * r * Math.cos(theta),
-      y: cy + ry * r * Math.sin(theta)
+      y: cy + ry * r * Math.sin(theta),
     };
   }
 
   // Sparkly VFX
-  function spawnSparkles(count = 18, origin = { x:110, y:85 }) {
+  function spawnSparkles(count = 18, origin = { x: 110, y: 85 }) {
     const palette = ["#ffffff", "#aee3ff", "#b7f7ff", "#d6c5ff", "#ffe7ff"];
     for (let i = 0; i < count; i++) {
       const s = document.createElement("div");
@@ -230,38 +243,45 @@
       hitOverlay.appendChild(s);
 
       const c = palette[Math.floor(Math.random() * palette.length)];
-      s.style.boxShadow =
-        `0 0 8px rgba(255,255,255,.9),
+      s.style.boxShadow = `0 0 8px rgba(255,255,255,.9),
          0 0 18px ${c}cc,
          0 0 32px ${c}99`;
 
       const angle = Math.random() * 2 * Math.PI;
-      const dist  = 60 + Math.random() * 120;
-      const tx    = Math.cos(angle) * dist;
-      const ty    = Math.sin(angle) * dist;
-      const spin  = (Math.random() * 2 - 1) * 1080;
+      const dist = 60 + Math.random() * 120;
+      const tx = Math.cos(angle) * dist;
+      const ty = Math.sin(angle) * dist;
+      const spin = (Math.random() * 2 - 1) * 1080;
       const scale = 0.7 + Math.random() * 1.1;
-      const dur   = 520 + Math.random() * 420;
+      const dur = 520 + Math.random() * 420;
 
       s.animate(
         [
           {
             transform: `translate3d(${origin.x}px,${origin.y}px,0) translate(-50%,-50%) scale(.5) rotate(0deg)`,
-            opacity: 0
+            opacity: 0,
           },
           {
-            transform: `translate3d(${origin.x + tx * 0.25}px,${origin.y + ty * 0.25}px,0) translate(-50%,-50%) scale(${scale}) rotate(${spin * 0.35}deg)`,
+            transform: `translate3d(${origin.x + tx * 0.25}px,${
+              origin.y + ty * 0.25
+            }px,0) translate(-50%,-50%) scale(${scale}) rotate(${
+              spin * 0.35
+            }deg)`,
             opacity: 1,
-            offset: 0.3
+            offset: 0.3,
           },
           {
-            transform: `translate3d(${origin.x + tx}px,${origin.y + ty}px,0) translate(-50%,-50%) scale(${scale * .7}) rotate(${spin}deg)`,
-            opacity: 0
-          }
+            transform: `translate3d(${origin.x + tx}px,${
+              origin.y + ty
+            }px,0) translate(-50%,-50%) scale(${
+              scale * 0.7
+            }) rotate(${spin}deg)`,
+            opacity: 0,
+          },
         ],
         {
           duration: dur,
-          easing: "cubic-bezier(.2,.9,.3,1)"
+          easing: "cubic-bezier(.2,.9,.3,1)",
         }
       );
 
@@ -270,8 +290,12 @@
   }
 
   // Donut ring VFX
-  function spawnMagicRing(origin = { x:110, y:85 }, options = {}) {
-    const { baseScale = 0.3, echo = 1, hue = Math.floor(180 + Math.random() * 60) } = options;
+  function spawnMagicRing(origin = { x: 110, y: 85 }, options = {}) {
+    const {
+      baseScale = 0.3,
+      echo = 1,
+      hue = Math.floor(180 + Math.random() * 60),
+    } = options;
 
     for (let i = 0; i < 1 + echo; i++) {
       const ring = document.createElement("div");
@@ -281,7 +305,7 @@
 
       const rot = (Math.random() * 2 - 1) * 22;
       const grow = 1.6 + i * 0.2;
-      const dur  = 440 + i * 120;
+      const dur = 440 + i * 120;
 
       const base = `translate3d(${origin.x}px,${origin.y}px,0) translate(-50%,-50%) rotate(${rot}deg)`;
       ring.style.transform = `${base} scale(${baseScale})`;
@@ -290,13 +314,13 @@
       ring.animate(
         [
           { transform: `${base} scale(${baseScale})`, opacity: 0 },
-          { transform: `${base} scale(1)`,           opacity: 0.95, offset: 0.28 },
-          { transform: `${base} scale(${grow})`,     opacity: 0 }
+          { transform: `${base} scale(1)`, opacity: 0.95, offset: 0.28 },
+          { transform: `${base} scale(${grow})`, opacity: 0 },
         ],
         {
           duration: dur,
           easing: "cubic-bezier(.2,.9,.3,1)",
-          fill: "both"
+          fill: "both",
         }
       );
 
@@ -317,10 +341,10 @@
     setTimeout(() => gremlin.classList.remove("magic-glow"), 220);
 
     const smile = document.getElementById("mouth-smile");
-    const sad   = document.getElementById("mouth-sad");
+    const sad = document.getElementById("mouth-sad");
     if (smile && sad) {
       smile.style.display = "none";
-      sad.style.display   = "block";
+      sad.style.display = "block";
     }
 
     const pL = document.getElementById("pupilL");
@@ -334,11 +358,11 @@
       [
         { transform: "translateY(0)" },
         { transform: "translateY(-6px)" },
-        { transform: "translateY(0)" }
+        { transform: "translateY(0)" },
       ],
       {
         duration: 320,
-        easing: "cubic-bezier(.2,.9,.3,1)"
+        easing: "cubic-bezier(.2,.9,.3,1)",
       }
     );
 
@@ -347,7 +371,7 @@
       if (state.bossHP > 0) {
         if (smile && sad) {
           smile.style.display = "block";
-          sad.style.display   = "none";
+          sad.style.display = "none";
         }
         if (pL && pR) {
           pL.setAttribute("cy", 74);
@@ -379,6 +403,7 @@
   function startPoll(options) {
     votesByUser.clear();
     voteCounts = Array.from({ length: options.length }, () => 0);
+    hadVotesThisPoll = false;
     pollActive = true;
     pollEndAt = Date.now() + POLL_SECONDS * 1000;
     pollBox.hidden = false;
@@ -387,13 +412,17 @@
 
     // create a server-side poll so the server (or tmi listener) can collect chat votes
     try {
-      currentPollId = `p_${Date.now()}_${Math.floor(Math.random()*9999)}`;
-      fetch(API_BASE + '/api/poll/start', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pollId: currentPollId, options })
-      }).catch(() => { currentPollId = null; });
-    } catch (e) { currentPollId = null; }
+      currentPollId = `p_${Date.now()}_${Math.floor(Math.random() * 9999)}`;
+      fetch(API_BASE + "/api/poll/start", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pollId: currentPollId, options }),
+      }).catch(() => {
+        currentPollId = null;
+      });
+    } catch (e) {
+      currentPollId = null;
+    }
 
     if (pollTicker) clearInterval(pollTicker);
     pollTicker = setInterval(tickPoll, 250);
@@ -410,7 +439,10 @@
 
   function renderPollBars(options) {
     pollBars.innerHTML = "";
-    const total = Math.max(1, voteCounts.reduce((a, b) => a + b, 0));
+    const total = Math.max(
+      1,
+      voteCounts.reduce((a, b) => a + b, 0)
+    );
 
     options.forEach((label, idx) => {
       const pct = Math.round((voteCounts[idx] / total) * 100);
@@ -448,64 +480,221 @@
       finishPoll();
     }
   }
+function finishPoll() {
+  // Stop the ticking timer for this poll
+  pollActive = false;
+  if (pollTicker) {
+    clearInterval(pollTicker);
+    pollTicker = null;
+  }
 
-  function finishPoll() {
-    // Prefer server-side tally if available
-    if (currentPollId) {
-      try {
-        fetch(API_BASE + '/api/poll/finish', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ pollId: currentPollId })
-        })
-        .then(r => r.json())
-        .then(j => {
-          if (j && typeof j.choiceIdx === 'number') {
-            handleAnswer(j.choiceIdx);
-          } else {
-            // fallback to local
-            localFinishFallback();
-          }
-        }).catch(() => localFinishFallback());
-      } catch (e) {
+  const hadAnyVotes = hadVotesThisPoll && voteCounts.length > 0;
+
+  // ❌ No votes at all -> treat as "no answer" and DO NOT award points
+  if (!hadAnyVotes) {
+    currentPollId = null;
+    handleAnswer(-1);  // -1 will never equal correctIndex
+    return;
+  }
+
+  // ✅ There WERE votes – prefer server-side tally if we have a pollId
+  if (currentPollId) {
+    try {
+      fetch(API_BASE + '/api/poll/finish', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pollId: currentPollId })
+      })
+      .then(r => r.json())
+      .then(j => {
+        if (j && typeof j.choiceIdx === 'number') {
+          // Server picked a winning option index
+          handleAnswer(j.choiceIdx);
+        } else {
+          // Fall back to local voteCounts-based winner
+          localFinishFallback();
+        }
+      })
+      .catch(() => {
+        // Server call failed, but we KNOW we had votes
         localFinishFallback();
-      }
-    } else {
+      });
+    } catch (e) {
       localFinishFallback();
     }
-
-    currentPollId = null;
+  } else {
+    // No server poll – just use local winner logic
+    localFinishFallback();
   }
 
-  function localFinishFallback() {
-    const max = Math.max(...voteCounts);
-    const tops = voteCounts
-      .map((v, i) => (v === max ? i : -1))
-      .filter(i => i !== -1);
-    const choiceIdx = tops[Math.floor(Math.random() * tops.length)];
+  currentPollId = null;
+}
 
-    // Credit chatters who voted for the winning choice (best-effort client-side)
-    try {
-      for (const [user, idx] of votesByUser.entries()) {
-        if (idx === choiceIdx && user) {
-          try {
-            fetch(API_BASE + '/api/leaderboard/increment', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ username: user, delta: 1 })
-            }).catch(() => {});
-          } catch (e) {}
-        }
-      }
-    } catch (e) {}
 
-    handleAnswer(choiceIdx);
+  // function finishPoll() {
+  //   // Did we actually get any votes this poll?
+  //   const hadAnyVotes = hadVotesThisPoll && voteCounts.length > 0;
+
+  //   // Prefer server-side tally if available
+  //   if (currentPollId) {
+  //     try {
+  //       fetch(API_BASE + "/api/poll/finish", {
+  //         method: "POST",
+  //         headers: { "Content-Type": "application/json" },
+  //         body: JSON.stringify({ pollId: currentPollId }),
+  //       })
+  //         .then((r) => r.json())
+  //         .then((j) => {
+  //           // ❌ No votes: treat as "no answer", never award points
+  //           if (!hadAnyVotes) {
+  //             handleAnswer(-1); // -1 will never equal correctIndex
+  //             return;
+  //           }
+
+  //           // ✅ Server gave us a winning choice index
+  //           if (j && typeof j.choiceIdx === "number") {
+  //             handleAnswer(j.choiceIdx);
+  //           } else {
+  //             // Fallback to local voteCounts-based winner
+  //             localFinishFallback();
+  //           }
+  //         })
+  //         .catch(() => {
+  //           // If server call failed, but we *did* have votes, use local fallback.
+  //           // If we had no votes, still treat as "no answer".
+  //           if (!hadAnyVotes) {
+  //             handleAnswer(-1);
+  //           } else {
+  //             localFinishFallback();
+  //           }
+  //         });
+  //     } catch (e) {
+  //       if (!hadAnyVotes) {
+  //         handleAnswer(-1);
+  //       } else {
+  //         localFinishFallback();
+  //       }
+  //     }
+  //   } else {
+  //     // No server poll: use local fallback, unless there were no votes.
+  //     if (!hadAnyVotes) {
+  //       handleAnswer(-1);
+  //     } else {
+  //       localFinishFallback();
+  //     }
+  //   }
+
+  //   currentPollId = null;
+  // }
+
+  // function finishPoll() {
+  //   // Prefer server-side tally if available
+  //   if (currentPollId) {
+  //     try {
+  //       fetch(API_BASE + '/api/poll/finish', {
+  //         method: 'POST',
+  //         headers: { 'Content-Type': 'application/json' },
+  //         body: JSON.stringify({ pollId: currentPollId })
+  //       })
+  //       .then(r => r.json())
+  //       .then(j => {
+  //         if (j && typeof j.choiceIdx === 'number') {
+  //           handleAnswer(j.choiceIdx);
+  //         } else {
+  //           // fallback to local
+  //           localFinishFallback();
+  //         }
+  //       }).catch(() => localFinishFallback());
+  //     } catch (e) {
+  //       localFinishFallback();
+  //     }
+  //   } else {
+  //     localFinishFallback();
+  //   }
+
+  //   currentPollId = null;
+  // }
+
+  // function localFinishFallback() {
+  //   const max = Math.max(...voteCounts);
+  //   const tops = voteCounts
+  //     .map((v, i) => (v === max ? i : -1))
+  //     .filter(i => i !== -1);
+  //   const choiceIdx = tops[Math.floor(Math.random() * tops.length)];
+
+  //   // Credit chatters who voted for the winning choice (best-effort client-side)
+  //   try {
+  //     for (const [user, idx] of votesByUser.entries()) {
+  //       if (idx === choiceIdx && user) {
+  //         try {
+  //           fetch(API_BASE + '/api/leaderboard/increment', {
+  //             method: 'POST',
+  //             headers: { 'Content-Type': 'application/json' },
+  //             body: JSON.stringify({ username: user, delta: 1 })
+  //           }).catch(() => {});
+  //         } catch (e) {}
+  //       }
+  //     }
+  //   } catch (e) {}
+
+  //   handleAnswer(choiceIdx);
+  // }
+
+  //   function localFinishFallback() {
+  //   if (!voteCounts.length) {
+  //     // no votes, just treat as "no choice" and move on
+  //     handleAnswer(-1);
+  //     return;
+  //   }
+
+  //   const max = Math.max(...voteCounts);
+  //   const tops = voteCounts
+  //     .map((v, i) => (v === max ? i : -1))
+  //     .filter(i => i !== -1);
+
+  //   const choiceIdx = tops[Math.floor(Math.random() * tops.length)];
+
+  //   handleAnswer(choiceIdx);
+  // }
+  // function localFinishFallback() {
+  //   // If nobody voted, treat as "no answer"
+  //   if (!hadVotesThisPoll || !voteCounts.length) {
+  //     handleAnswer(-1); // -1 can NEVER equal the correct answer
+  //     return;
+  //   }
+
+  //   const max = Math.max(...voteCounts);
+  //   const tops = voteCounts
+  //     .map((v, i) => (v === max ? i : -1))
+  //     .filter((i) => i !== -1);
+
+  //   const choiceIdx = tops[Math.floor(Math.random() * tops.length)];
+
+  //   // Don't award points here — handleAnswer() decides correctness
+  //   handleAnswer(choiceIdx);
+  // }
+function localFinishFallback() {
+  if (!voteCounts.length) {
+    handleAnswer(-1);
+    return;
   }
+
+  const max = Math.max(...voteCounts);
+  const tops = voteCounts
+    .map((v, i) => (v === max ? i : -1))
+    .filter(i => i !== -1);
+
+  const choiceIdx = tops[Math.floor(Math.random() * tops.length)];
+
+  // No scoring logic here – handleAnswer decides correctness + points
+  handleAnswer(choiceIdx);
+}
+
   function tryRegisterVote(user, text, options) {
     if (!pollActive || state.paused) return;
     if (!user || !text) return;
 
-    const raw   = String(text).trim();
+    const raw = String(text).trim();
     const lower = raw.toLowerCase();
     let idx = -1;
 
@@ -518,12 +707,15 @@
 
     // aliases: !fact / !myth map to labels (case-insensitive)
     if (idx === -1) {
-      const norm = options.map(o => String(o).toLowerCase());
+      const norm = options.map((o) => String(o).toLowerCase());
       if (/^!fact\b/.test(lower)) idx = norm.indexOf("fact");
       else if (/^!myth\b/.test(lower)) idx = norm.indexOf("myth");
     }
 
     if (idx < 0 || idx >= options.length) return;
+
+    // ✅ we got at least one valid vote this poll
+    hadVotesThisPoll = true;
 
     const prev = votesByUser.get(user);
     if (prev === undefined) {
@@ -538,10 +730,10 @@
     // Forward the vote to server-side poll collector (best-effort)
     try {
       if (currentPollId) {
-        fetch(API_BASE + '/api/poll/vote', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ pollId: currentPollId, username: user, text })
+        fetch(API_BASE + "/api/poll/vote", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ pollId: currentPollId, username: user, text }),
         }).catch(() => {});
       }
     } catch (e) {}
@@ -549,11 +741,61 @@
     renderPollBars(options);
   }
 
-    // --- Socket.IO: receive Twitch chat forwarded from server.js ---
+  // function tryRegisterVote(user, text, options) {
+  //   if (!pollActive || state.paused) return;
+  //   if (!user || !text) return;
+
+  //   const raw   = String(text).trim();
+  //   const lower = raw.toLowerCase();
+  //   let idx = -1;
+
+  //   // "!vote <n>" for any number of options
+  //   const m = lower.match(/^!vote\s*(\d{1,2})\b/);
+  //   if (m) {
+  //     const n = parseInt(m[1], 10);
+  //     if (n >= 1 && n <= options.length) idx = n - 1;
+  //   }
+
+  //   // aliases: !fact / !myth map to labels (case-insensitive)
+  //   if (idx === -1) {
+  //     const norm = options.map(o => String(o).toLowerCase());
+  //     if (/^!fact\b/.test(lower)) idx = norm.indexOf("fact");
+  //     else if (/^!myth\b/.test(lower)) idx = norm.indexOf("myth");
+  //   }
+
+  //   if (idx < 0 || idx >= options.length) return;
+
+  //   const prev = votesByUser.get(user);
+  //   if (prev === undefined) {
+  //     voteCounts[idx]++;
+  //     votesByUser.set(user, idx);
+  //   } else if (prev !== idx) {
+  //     voteCounts[prev]--;
+  //     voteCounts[idx]++;
+  //     votesByUser.set(user, idx);
+  //   }
+
+  //   // Forward the vote to server-side poll collector (best-effort)
+  //   try {
+  //     if (currentPollId) {
+  //       fetch(API_BASE + '/api/poll/vote', {
+  //         method: 'POST',
+  //         headers: { 'Content-Type': 'application/json' },
+  //         body: JSON.stringify({ pollId: currentPollId, username: user, text })
+  //       }).catch(() => {});
+  //     }
+  //   } catch (e) {}
+
+  //   renderPollBars(options);
+  // }
+
+  // --- Socket.IO: receive Twitch chat forwarded from server.js ---
   (function initSocket() {
     try {
       if (typeof io === "undefined") {
-        console.warn("Socket.IO client not found (no /socket.io/socket.io.js?)");
+        console.warn(
+          "Socket.IO client not found (no /socket.io/socket.io.js?)"
+        );
         return;
       }
 
@@ -566,14 +808,14 @@
       socket.on("chatMessage", (payload) => {
         if (!payload) return;
         const username = (payload.username || "").toString();
-        const text     = (payload.text || "").toString();
+        const text = (payload.text || "").toString();
         if (!username || !text) return;
 
         // remember last chat user for scoring in handleAnswer()
         try {
           window.__lastChatEvent = {
             displayName: username,
-            text
+            text,
           };
         } catch (e) {}
 
@@ -587,7 +829,6 @@
       console.error("Socket.IO init failed:", e);
     }
   })();
-
 
   // function tryRegisterVote(user, text, options) {
   //   if (!pollActive || state.paused) return;
@@ -672,8 +913,8 @@
       return;
     }
 
-    const btns   = [...answersWrap.querySelectorAll("button")];
-    const correct = (choiceIdx === item.correctIndex);
+    const btns = [...answersWrap.querySelectorAll("button")];
+    const correct = choiceIdx === item.correctIndex;
 
     btns.forEach((b, i) => {
       b.classList.toggle("correct", i === item.correctIndex);
@@ -684,17 +925,18 @@
     if (correct) {
       stopGhostDance();
       gremlinHit();
-      setScore(state.score + 1);        // ✅ score only goes UP here
+      setScore(state.score + 1); // ✅ score only goes UP here
       // Best-effort: attribute the point to the last chat user (if available)
       try {
         const last = window.__lastChatEvent || null;
-        const userFromEvent = last && (last.displayName || last.nick || last.username || last.user);
-        const username = (userFromEvent || '').toString().trim();
+        const userFromEvent =
+          last && (last.displayName || last.nick || last.username || last.user);
+        const username = (userFromEvent || "").toString().trim();
         if (username) {
-            fetch(API_BASE + '/api/leaderboard/increment', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username, delta: 1 })
+          fetch(API_BASE + "/api/leaderboard/increment", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username, delta: 1 }),
           }).catch(() => {});
         }
       } catch (e) {}
@@ -795,7 +1037,7 @@
       const d = obj && obj.detail;
       if (!d) return;
       if (d.listener === "message") {
-        const ev   = d.event || d.data || {};
+        const ev = d.event || d.data || {};
         const data = ev.data || ev;
         const text = (data.text || data.message || "").toString();
         const user = (
@@ -806,7 +1048,9 @@
           ""
         ).toString();
         // Store last chat event for attribution when a correct answer gets registered
-        try { window.__lastChatEvent = data; } catch (e) {}
+        try {
+          window.__lastChatEvent = data;
+        } catch (e) {}
         const item = ACTIVE[state.questionIndex];
         if (item) tryRegisterVote(user, text, item.options);
       }
@@ -815,8 +1059,9 @@
 
   // Fake chat harness for CodePen (optional)
   let SIM_TIMER = null;
-  const FAKE_NAMES = Array.from({ length: 200 }, (_, i) =>
-    `Viewer_${(i + 1).toString().padStart(3, "0")}`
+  const FAKE_NAMES = Array.from(
+    { length: 200 },
+    (_, i) => `Viewer_${(i + 1).toString().padStart(3, "0")}`
   );
   const CMDS = ["!vote 1", "!vote 2", "!fact", "!myth"];
 
@@ -828,8 +1073,8 @@
       new CustomEvent("onEventReceived", {
         detail: {
           listener: "message",
-          event: { data: { text, displayName: name } }
-        }
+          event: { data: { text, displayName: name } },
+        },
       })
     );
   }
@@ -849,9 +1094,9 @@
 
   (function initSim() {
     const startBtn = document.getElementById("btnSimStart");
-    const stopBtn  = document.getElementById("btnSimStop");
-    const rate     = document.getElementById("simRate");
-    const rateVal  = document.getElementById("simRateVal");
+    const stopBtn = document.getElementById("btnSimStop");
+    const rate = document.getElementById("simRate");
+    const rateVal = document.getElementById("simRateVal");
 
     if (!startBtn || !rate || !rateVal || !stopBtn) return;
 
@@ -861,7 +1106,7 @@
     });
 
     startBtn.onclick = () => startFakeVotes(parseInt(rate.value, 10));
-    stopBtn.onclick  = () => stopFakeVotes();
+    stopBtn.onclick = () => stopFakeVotes();
   })();
 
   // ---- Safe JSON Import (client-only) ----
@@ -880,18 +1125,23 @@
     if (typeof options === "string") {
       options = options
         .split(/[|,]/g)
-        .map(s => s.trim())
+        .map((s) => s.trim())
         .filter(Boolean);
     }
 
-    if (!Array.isArray(options)) throw new Error("options must be an array or comma string");
-    options = options.map(o => String(o).trim()).filter(Boolean);
+    if (!Array.isArray(options))
+      throw new Error("options must be an array or comma string");
+    options = options.map((o) => String(o).trim()).filter(Boolean);
 
-    let correctIndex = Number.isInteger(raw.correctIndex) ? raw.correctIndex : -1;
+    let correctIndex = Number.isInteger(raw.correctIndex)
+      ? raw.correctIndex
+      : -1;
     if (correctIndex < 0) {
-      const label = String(raw.correct ?? "").trim().toLowerCase();
+      const label = String(raw.correct ?? "")
+        .trim()
+        .toLowerCase();
       if (label) {
-        const idx = options.findIndex(o => o.toLowerCase() === label);
+        const idx = options.findIndex((o) => o.toLowerCase() === label);
         if (idx !== -1) correctIndex = idx;
       }
     }
@@ -899,28 +1149,33 @@
     const explain = String(raw.explain ?? raw.explanation ?? "").trim();
 
     if (!q || q.length < 4 || q.length > 300) throw new Error("bad question");
-    if (options.length < 2 || options.length > 6) throw new Error("2–6 options");
-    if (options.some(o => o.length > 80)) throw new Error("option too long");
-    if (correctIndex < 0 || correctIndex >= options.length) throw new Error("bad correct");
+    if (options.length < 2 || options.length > 6)
+      throw new Error("2–6 options");
+    if (options.some((o) => o.length > 80)) throw new Error("option too long");
+    if (correctIndex < 0 || correctIndex >= options.length)
+      throw new Error("bad correct");
     if (!explain || explain.length > 300) throw new Error("bad explanation");
 
     return { q, options, correctIndex, explain };
   }
 
-  async function importFromFile(mode) { // 'replace' | 'append'
+  async function importFromFile(mode) {
+    // 'replace' | 'append'
     const file = qFile?.files?.[0];
-    if (!file)  return setImpMsg("Choose a .json file first", false);
-    if (file.type && !/json/i.test(file.type)) return setImpMsg("File must be JSON", false);
+    if (!file) return setImpMsg("Choose a .json file first", false);
+    if (file.type && !/json/i.test(file.type))
+      return setImpMsg("File must be JSON", false);
     if (file.size > 500_000) return setImpMsg("File too large (>500KB)", false);
 
     try {
       const text = await file.text();
       const data = JSON.parse(text);
       if (!Array.isArray(data)) throw new Error("Expected a JSON array");
-      if (data.length > 500)    throw new Error("Too many questions (>500)");
+      if (data.length > 500) throw new Error("Too many questions (>500)");
 
       const items = [];
-      let ok = 0, bad = 0;
+      let ok = 0,
+        bad = 0;
 
       for (const raw of data) {
         try {
@@ -934,7 +1189,7 @@
       if (!ok) return setImpMsg("No valid questions found.", false);
 
       if (mode === "replace") QUESTIONS = items;
-      else                    QUESTIONS = QUESTIONS.concat(items);
+      else QUESTIONS = QUESTIONS.concat(items);
 
       setImpMsg(`Imported ${ok} item(s)${bad ? `, ${bad} skipped` : ""}.`);
       reset();
