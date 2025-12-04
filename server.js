@@ -127,52 +127,165 @@ app.post('/api/poll/finish', (req, res) => {
     }
   }
 
+  // Majority choice for boss/player HP logic
   const max = Math.max(...voteCounts);
   const tops = voteCounts
     .map((v, i) => (v === max ? i : -1))
     .filter(i => i !== -1);
 
-  const choiceIdx = tops[Math.floor(Math.random() * tops.length)];
+  const choiceIdx = tops[Math.floor(Math.random() * tops.length)] ?? 0;
   console.log('Poll finished:', pollId, 'winner index:', choiceIdx);
 
-  // Credit winners
-  try {
-    const scores = readScores();
-    for (const [user, idx] of poll.votes.entries()) {
-      if (idx === choiceIdx && user) {
-        const cur = Number.isFinite(scores[user]) ? Number(scores[user]) : 0;
-        scores[user] = cur + 1;
+  // ✅ Only award points to *correct* voters, not just majority
+  const correctIndexRaw = body.correctIndex;
+  let correctIndex = Number.isInteger(correctIndexRaw)
+    ? correctIndexRaw
+    : parseInt(correctIndexRaw, 10);
+
+  const hasValidCorrect =
+    Number.isInteger(correctIndex) &&
+    correctIndex >= 0 &&
+    correctIndex < poll.options.length;
+
+  if (hasValidCorrect) {
+    try {
+      const scores = readScores();
+      for (const [user, idx] of poll.votes.entries()) {
+        if (idx === correctIndex && user) {
+          const cur = Number.isFinite(scores[user]) ? Number(scores[user]) : 0;
+          scores[user] = cur + 1;
+        }
       }
+      writeScores(scores);
+    } catch (e) {
+      console.error('Failed to credit winners', e);
     }
-    writeScores(scores);
-  } catch (e) {
-    console.error('Failed to credit winners', e);
   }
 
   delete POLLS[pollId];
 
+  // Client still needs the majority choice for handleAnswer()
   res.json({ ok: true, choiceIdx });
 });
 
-// Accept a direct vote via HTTP
-app.post('/api/poll/vote', (req, res) => {
+app.post('/api/poll/finish', (req, res) => {
   const body = req.body || {};
   const pollId = String(body.pollId || '').trim();
-  const username = String(body.username || '').trim();
-  const text = String(body.text || '').trim();
+  let correctIndex = body.correctIndex;
 
   if (!pollId || !POLLS[pollId]) {
     return res.status(400).json({ error: 'unknown pollId' });
   }
 
   const poll = POLLS[pollId];
-  const idx = normalizeVoteText(text, poll.options);
 
-  if (idx < 0) return res.json({ ok: false, reason: 'no vote parsed' });
+  // Normalize correctIndex to a valid integer
+  if (!Number.isInteger(correctIndex)) {
+    correctIndex = parseInt(correctIndex, 10);
+  }
 
-  poll.votes.set(username, idx);
-  return res.json({ ok: true });
+  const hasValidCorrect =
+    Number.isInteger(correctIndex) &&
+    correctIndex >= 0 &&
+    correctIndex < poll.options.length;
+
+  console.log('Poll finished:', pollId, {
+    correctIndex,
+    hasValidCorrect,
+    votesCount: poll.votes.size
+  });
+
+  if (hasValidCorrect) {
+    try {
+      const scores = readScores();
+
+      for (const [user, idx] of poll.votes.entries()) {
+        if (idx === correctIndex && user) {
+          const cur = Number.isFinite(scores[user]) ? Number(scores[user]) : 0;
+          scores[user] = cur + 1;
+        }
+      }
+
+      writeScores(scores);
+    } catch (e) {
+      console.error('Failed to credit winners', e);
+    }
+  } else {
+    console.warn('No valid correctIndex provided for poll', pollId);
+  }
+
+  // Clean up this poll
+  delete POLLS[pollId];
+
+  // For the overlay visuals, just tell it "this is the final answer index"
+  res.json({ ok: true, choiceIdx: hasValidCorrect ? correctIndex : 0 });
 });
+
+// app.post('/api/poll/finish', (req, res) => {
+//   const body = req.body || {};
+//   const pollId = String(body.pollId || '').trim();
+
+//   if (!pollId || !POLLS[pollId]) {
+//     return res.status(400).json({ error: 'unknown pollId' });
+//   }
+
+//   const poll = POLLS[pollId];
+//   const voteCounts = Array.from({ length: poll.options.length }, () => 0);
+
+//   for (const idx of poll.votes.values()) {
+//     if (Number.isInteger(idx) && idx >= 0 && idx < voteCounts.length) {
+//       voteCounts[idx]++;
+//     }
+//   }
+
+//   const max = Math.max(...voteCounts);
+//   const tops = voteCounts
+//     .map((v, i) => (v === max ? i : -1))
+//     .filter(i => i !== -1);
+
+//   const choiceIdx = tops[Math.floor(Math.random() * tops.length)];
+//   console.log('Poll finished:', pollId, 'winner index:', choiceIdx);
+
+//   // Credit winners
+//   try {
+//     const scores = readScores();
+//     for (const [user, idx] of poll.votes.entries()) {
+//       if (idx === choiceIdx && user) {
+//         const cur = Number.isFinite(scores[user]) ? Number(scores[user]) : 0;
+//         scores[user] = cur + 1;
+//       }
+//     }
+//     writeScores(scores);
+//   } catch (e) {
+//     console.error('Failed to credit winners', e);
+//   }
+
+//   delete POLLS[pollId];
+
+//   res.json({ ok: true, choiceIdx });
+// });
+
+// Accept a direct vote via HTTP
+
+
+// app.post('/api/poll/vote', (req, res) => {
+//   const body = req.body || {};
+//   const pollId = String(body.pollId || '').trim();
+//   const username = String(body.username || '').trim();
+//   const text = String(body.text || '').trim();
+
+//   if (!pollId || !POLLS[pollId]) {
+//     return res.status(400).json({ error: 'unknown pollId' });
+//   }
+
+//   const poll = POLLS[pollId];
+//   const idx = normalizeVoteText(text, poll.options);
+
+//   if (idx < 0) return res.json({ ok: false, reason: 'no vote parsed' });
+
+//   poll.votes.set(username, idx);
+//   return res.json({ ok: true });
+// });
 
 // ─────────────────────────────────────────────
 //                 TWITCH CHAT (OPTIONAL)

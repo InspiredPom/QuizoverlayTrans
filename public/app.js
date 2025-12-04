@@ -480,73 +480,76 @@
       finishPoll();
     }
   }
-function finishPoll() {
-  // Stop the ticking timer for this poll
-  pollActive = false;
-  if (pollTicker) {
-    clearInterval(pollTicker);
-    pollTicker = null;
-  }
 
-  const hadAnyVotes = hadVotesThisPoll && voteCounts.length > 0;
+  function finishPoll() {
+    // Stop the ticking timer for this poll
+    pollActive = false;
+    if (pollTicker) {
+      clearInterval(pollTicker);
+      pollTicker = null;
+    }
 
-  // ❌ No votes at all -> treat as "no answer" and DO NOT award points
-  if (!hadAnyVotes) {
-    currentPollId = null;
-    handleAnswer(-1);  // -1 will never equal correctIndex
-    return;
-  }
+    const hadAnyVotes = hadVotesThisPoll && voteCounts.length > 0;
 
-  // ✅ There WERE votes – prefer server-side tally if we have a pollId
-  if (currentPollId) {
-    try {
-      fetch(API_BASE + '/api/poll/finish', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pollId: currentPollId })
-      })
-      .then(r => r.json())
-      .then(j => {
-        if (j && typeof j.choiceIdx === 'number') {
-          // Server picked a winning option index
-          handleAnswer(j.choiceIdx);
-        } else {
-          // Fall back to local voteCounts-based winner
-          localFinishFallback();
-        }
-      })
-      .catch(() => {
-        // Server call failed, but we KNOW we had votes
+    // ❌ No votes at all -> treat as "no answer" and DO NOT award points
+    if (!hadAnyVotes) {
+      currentPollId = null;
+      handleAnswer(-1); // -1 will never equal correctIndex
+      return;
+    }
+
+    // ✅ There WERE votes – prefer server-side tally if we have a pollId
+    if (currentPollId) {
+      try {
+        const item = ACTIVE[state.questionIndex];
+        const correctIndex = item ? item.correctIndex : -1;
+
+        fetch(API_BASE + "/api/poll/finish", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ pollId: currentPollId, correctIndex }),
+        })
+          .then((r) => r.json())
+          .then((j) => {
+            if (j && typeof j.choiceIdx === "number") {
+              // Use the server-chosen "final answer" (majority choice) for visuals
+              handleAnswer(j.choiceIdx);
+            } else {
+              // Fall back to local voteCounts-based winner
+              localFinishFallback();
+            }
+          })
+          .catch(() => {
+            // Server call failed, but we KNOW we had votes
+            localFinishFallback();
+          });
+      } catch (e) {
         localFinishFallback();
-      });
-    } catch (e) {
+      }
+    } else {
+      // No server poll – just use local winner logic
       localFinishFallback();
     }
-  } else {
-    // No server poll – just use local winner logic
-    localFinishFallback();
+
+    currentPollId = null;
   }
 
-  currentPollId = null;
-}
+  function localFinishFallback() {
+    if (!voteCounts.length) {
+      handleAnswer(-1);
+      return;
+    }
 
+    const max = Math.max(...voteCounts);
+    const tops = voteCounts
+      .map((v, i) => (v === max ? i : -1))
+      .filter((i) => i !== -1);
 
-function localFinishFallback() {
-  if (!voteCounts.length) {
-    handleAnswer(-1);
-    return;
+    const choiceIdx = tops[Math.floor(Math.random() * tops.length)];
+
+    // No scoring logic here – handleAnswer decides correctness + points
+    handleAnswer(choiceIdx);
   }
-
-  const max = Math.max(...voteCounts);
-  const tops = voteCounts
-    .map((v, i) => (v === max ? i : -1))
-    .filter(i => i !== -1);
-
-  const choiceIdx = tops[Math.floor(Math.random() * tops.length)];
-
-  // No scoring logic here – handleAnswer decides correctness + points
-  handleAnswer(choiceIdx);
-}
 
   function tryRegisterVote(user, text, options) {
     if (!pollActive || state.paused) return;
@@ -598,8 +601,6 @@ function localFinishFallback() {
 
     renderPollBars(options);
   }
-
-
 
   // --- Socket.IO: receive Twitch chat forwarded from server.js ---
   (function initSocket() {
@@ -691,19 +692,19 @@ function localFinishFallback() {
       gremlinHit();
       setScore(state.score + 1); // ✅ score only goes UP here
       // Best-effort: attribute the point to the last chat user (if available)
-      try {
-        const last = window.__lastChatEvent || null;
-        const userFromEvent =
-          last && (last.displayName || last.nick || last.username || last.user);
-        const username = (userFromEvent || "").toString().trim();
-        if (username) {
-          fetch(API_BASE + "/api/leaderboard/increment", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ username, delta: 1 }),
-          }).catch(() => {});
-        }
-      } catch (e) {}
+      // try {
+      //   const last = window.__lastChatEvent || null;
+      //   const userFromEvent =
+      //     last && (last.displayName || last.nick || last.username || last.user);
+      //   const username = (userFromEvent || "").toString().trim();
+      //   if (username) {
+      //     fetch(API_BASE + "/api/leaderboard/increment", {
+      //       method: "POST",
+      //       headers: { "Content-Type": "application/json" },
+      //       body: JSON.stringify({ username, delta: 1 }),
+      //     }).catch(() => {});
+      //   }
+      // } catch (e) {}
 
       setBossHP(state.bossHP - 25);
       setPlayerHP(state.playerHP - 10);
